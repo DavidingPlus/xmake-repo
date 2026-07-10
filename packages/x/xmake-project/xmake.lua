@@ -23,6 +23,6 @@ package("xmake-project")
 
     on_test(function(package)
         assert(os.isfile(
-            path.join(package:installdir(), "include/config.h")
+            path.join(package:installdir(), "config/config.h")
         ))
     end)
