@@ -18,7 +18,12 @@ package("xmake-project")
     end)
 
     on_install(function(package)
-        os.cp("*", package:installdir())
+        local mode = package:debug() and "debug" or "release"
+
+        os.cp(
+            path.join(mode, "*"),
+            package:installdir()
+        )
     end)
 
     on_test(function(package)
