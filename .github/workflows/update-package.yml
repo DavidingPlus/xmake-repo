@@ -5,6 +5,10 @@ on:
     types:
       - update-package
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   update:
 
@@ -26,6 +30,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CLIENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
         run: node .github/scripts/update-package.js
+
+      - name: Check changes
+        run: |
+          git status
+          git diff
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
