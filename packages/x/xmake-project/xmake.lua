@@ -3,6 +3,22 @@ package("xmake-project")
 
     on_source(function(package)
         local suffix = package:plat() .. "-" .. package:arch()
+        local runtime = package:config("runtimes")
+
+        if package:plat() == "windows" then
+            local runtime = package:config("runtimes")
+
+            -- 如果用户没有指定 runtime，根据当前构建模式选择默认 runtime。
+            if nil == runtime then
+                if is_mode("debug") then
+                    runtime = "MDd"
+                else
+                    runtime = "MD"
+                end
+            end
+
+            suffix = suffix .. "-" .. runtime
+        end
 
         package:add(
             "urls",
@@ -18,12 +34,7 @@ package("xmake-project")
     end)
 
     on_install(function(package)
-        local mode = package:debug() and "debug" or "release"
-
-        os.cp(
-            path.join(mode, "*"),
-            package:installdir()
-        )
+        os.cp("*", package:installdir())
     end)
 
     on_test(function(package)
