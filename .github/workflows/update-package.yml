@@ -1,0 +1,36 @@
+name: Update package version
+
+on:
+  repository_dispatch:
+    types:
+      - update-package
+
+jobs:
+  update:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependency
+        run: npm install @octokit/rest
+
+      - name: Update versions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLIENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+        run: node .github/scripts/update-package.js
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: update-${{ github.event.client_payload.package }}-${{ github.event.client_payload.version }}
+          title: update ${{ github.event.client_payload.package }} ${{ github.event.client_payload.version }}
+          commit-message: update package version
+          body: Automated update from release.
