@@ -45,6 +45,7 @@ jobs:
 
     - name: Build and Run
       working-directory: ${{ github.workspace }}
+      shell: bash
       run: |
         for mode in debug release; do
           echo "Building $mode"
