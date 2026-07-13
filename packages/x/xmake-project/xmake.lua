@@ -5,7 +5,7 @@ package("xmake-project")
         local suffix = package:plat() .. "-" .. package:arch()
         local runtime = package:config("runtimes")
 
-        if package:plat() == "windows" then
+        if package:is_plat("windows") then
             local runtime = package:config("runtimes")
 
             -- 如果用户没有指定 runtime，根据当前构建模式选择默认 runtime。
@@ -31,6 +31,16 @@ package("xmake-project")
             "versionfiles",
             "versions/" .. suffix .. ".txt"
         )
+    end)
+
+    on_load(function(package)
+        -- Linux 下加载包的时候将库的路径添加到环境变量 LD_LIBRARY_PATH 中。
+        if package:is_plat("linux") then
+            package:addenv(
+                "LD_LIBRARY_PATH",
+                path.join(package:installdir(), "lib")
+            )
+        end
     end)
 
     on_install(function(package)
