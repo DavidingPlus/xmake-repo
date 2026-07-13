@@ -16,3 +16,6 @@ core
 *.mod
 *.order
 *.symvers
+
+package*.json
+node_modules/
