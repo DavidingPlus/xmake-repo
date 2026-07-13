@@ -2,6 +2,57 @@ const fs = require("fs");
 const path = require("path");
 
 
+function updateVersionFile(file, version, digest) {
+    let lines = [];
+
+    if (fs.existsSync(file)) {
+        const content = fs.readFileSync(file, "utf8");
+
+        lines = content
+            .split("\n")
+            .filter(Boolean);
+    }
+
+    let updated = false;
+    let found = false;
+
+    lines = lines.map(line => {
+        const [oldVersion, oldDigest] = line.split(/\s+/);
+
+        if (oldVersion === version) {
+            found = true;
+
+            if (oldDigest !== digest) {
+                updated = true;
+                return `${version} ${digest}`;
+            }
+
+            return line;
+        }
+
+        return line;
+    });
+
+
+    // 新版本。
+    if (!found) {
+        lines.push(`${version} ${digest}`);
+        updated = true;
+    }
+
+    if (updated) {
+        fs.writeFileSync(
+            file,
+            lines.join("\n") + "\n"
+        );
+
+        console.log(`updated ${file}`);
+    } else {
+        console.log(`unchanged ${file}`);
+    }
+}
+
+
 async function main() {
     const payload = JSON.parse(process.env.CLIENT_PAYLOAD);
     const packageName = payload.package;
@@ -71,9 +122,10 @@ async function main() {
 
         const line = `${version} ${digest}\n`;
 
-        fs.appendFileSync(
+        updateVersionFile(
             file,
-            line
+            version,
+            digest
         );
 
         console.log(
