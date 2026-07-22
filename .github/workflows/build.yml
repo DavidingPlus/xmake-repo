@@ -52,6 +52,8 @@ jobs:
 
     - name: Build and Run
       working-directory: ${{ github.workspace }}
+      env:
+        CI_XMAKE_REPO: ${{ github.workspace }}
       shell: bash
       run: |
         for mode in debug release; do
@@ -62,6 +64,8 @@ jobs:
             -p ${{ matrix.plat }} \
             -a ${{ matrix.xmake-arch }} \
             -y
+
+          xmake repo --list
 
           xmake build
           xmake run
