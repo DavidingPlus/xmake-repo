@@ -40,6 +40,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        # pull_request 时 checkout PR 源分支，即 github.head_ref。
+        # push / workflow_dispatch 时，github.head_ref 为空，checkout 当前 ref，即 github.ref。
+        ref: ${{ github.head_ref || github.ref }}
 
     - name: Setup XMake
       uses: xmake-io/github-action-setup-xmake@v1
