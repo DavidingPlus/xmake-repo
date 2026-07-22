@@ -52,8 +52,12 @@ jobs:
 
     - name: Build and Run
       working-directory: ${{ github.workspace }}
+      env:
+        CI_XMAKE_REPO: ${{ github.workspace }}
       shell: bash
       run: |
+        xrepo list-repo
+
         for mode in debug release; do
           echo "Building $mode"
 
