@@ -45,6 +45,13 @@ package("coroutine")
 
     on_install(function(package)
         os.cp("*", package:installdir())
+
+        package:add("includedirs", "config")
+        package:add("includedirs", "include")
+
+        for _, dir in ipairs(os.dirs("include/**")) do
+            package:add("includedirs", dir)
+        end
     end)
 
     on_test(function(package)
