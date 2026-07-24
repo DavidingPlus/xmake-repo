@@ -45,6 +45,9 @@ package("xmake-project")
 
     on_install(function(package)
         os.cp("*", package:installdir())
+
+        add_includedirs("config", {public = true})
+        add_includedirs("include", os.dirs("include/**"), {public = true})
     end)
 
     on_test(function(package)
