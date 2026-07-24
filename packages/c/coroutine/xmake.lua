@@ -41,6 +41,10 @@ package("coroutine")
                 path.join(package:installdir(), "lib")
             )
         end
+    end)
+
+    on_install(function(package)
+        os.cp("*", package:installdir())
 
         package:add("includedirs", "config")
         package:add("includedirs", "include")
@@ -48,10 +52,6 @@ package("coroutine")
         for _, dir in ipairs(os.dirs("include/**")) do
             package:add("includedirs", dir)
         end
-    end)
-
-    on_install(function(package)
-        os.cp("*", package:installdir())
     end)
 
     on_test(function(package)
