@@ -43,13 +43,17 @@ package("muduo-core")
                 path.join(package:installdir(), "lib")
             )
         end
+
+        package:add("includedirs", "config")
+        package:add("includedirs", "include")
+
+        for _, dir in ipairs(os.dirs("include/**")) do
+            package:add("includedirs", dir)
+        end
     end)
 
     on_install(function(package)
         os.cp("*", package:installdir())
-
-        add_includedirs("config", {public = true})
-        add_includedirs("include", os.dirs("include/**"), {public = true})
     end)
 
     on_test(function(package)
