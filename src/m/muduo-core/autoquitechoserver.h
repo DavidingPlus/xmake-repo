@@ -3,7 +3,7 @@
 #include <atomic>
 #include <string>
 
-#include "baseechoserver.h"
+#include <baseechoserver.h>
 
 
 // AutoQuitEchoServer 在 BaseEchoServer 的基础上增加“自动退出”语义：当累计接待的客户端数量达到 expectedClients，且当前已无存活连接时，服务端会在所属 EventLoop 中排队执行 quit()，用于测试这类场景。

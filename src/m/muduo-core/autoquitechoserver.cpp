@@ -1,4 +1,4 @@
-#include "autoquitechoserver.h"
+#include <autoquitechoserver.h>
 
 
 void AutoQuitEchoServer::onConnection(const TcpConnectionPtr &conn)

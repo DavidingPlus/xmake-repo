@@ -14,7 +14,7 @@
 #include <thread>
 #include <vector>
 
-#include "autoquitechoserver.h"
+#include <autoquitechoserver.h>
 
 
 namespace
