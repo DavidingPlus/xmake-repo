@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include <ltest.h>
+#include <xmake-project/ltest.h>
 
 
 int main()
