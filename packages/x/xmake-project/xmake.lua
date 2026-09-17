@@ -46,16 +46,11 @@ package("xmake-project")
     on_install(function(package)
         os.cp("*", package:installdir())
 
-        package:add("includedirs", "config")
         package:add("includedirs", "include")
-
-        for _, dir in ipairs(os.dirs("include/**")) do
-            package:add("includedirs", dir)
-        end
     end)
 
     on_test(function(package)
         assert(os.isfile(
-            path.join(package:installdir(), "config/config.h")
+            path.join(package:installdir(), "include/xmake-project/config.h")
         ))
     end)
