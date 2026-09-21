@@ -1,10 +1,11 @@
 package("xmake-project")
     set_description("The xmake project template")
 
-    -- shared 是 XMake 内置配置。默认选择动态库，使用方也可以通过 shared=false 选择静态库。
-    add_configs("shared", {
-        description = "Use the shared library.",
-        default = true
+    -- XMake 会把内置 shared=false 视为全局默认值并省略。如果直接把 shared 的包默认值改成 true，外层传入的 shared=false 可能会丢失。因此使用独立配置保存包的默认值，再同步给 shared。
+    add_configs("build_shared", {
+        description = "Build the shared library.",
+        default = true,
+        type = "boolean"
     })
 
     on_source(function(package)
@@ -25,7 +26,7 @@ package("xmake-project")
         end
 
         -- 动态库和静态库都使用显式后缀。
-        suffix = suffix .. (package:config("shared") and "-shared" or "-static")
+        suffix = suffix .. (package:config("build_shared") and "-shared" or "-static")
 
         package:add(
             "urls",
@@ -41,13 +42,18 @@ package("xmake-project")
     end)
 
     on_load(function(package)
-        if package:config("shared") and package:is_plat("linux") then
+        local build_shared = package:config("build_shared")
+
+        -- 让 XMake 后续按动态库/静态库处理包的链接信息。
+        package:config_set("shared", build_shared)
+
+        if build_shared and package:is_plat("linux") then
             -- Linux 动态库位于安装目录的 lib/ 下。
             package:addenv(
                 "LD_LIBRARY_PATH",
                 path.join(package:installdir(), "lib")
             )
-        elseif package:config("shared") and package:is_plat("windows") then
+        elseif build_shared and package:is_plat("windows") then
             -- Windows DLL 位于安装目录的 bin/ 下。将其加入 PATH，保证依赖该包的可执行程序能够找到 dll 文件。
             package:addenv("PATH", "bin")
 
