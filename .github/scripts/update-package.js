@@ -98,10 +98,14 @@ async function main() {
      * asset 名称映射。
      */
     function getVersionFile(name) {
-        if (name.includes("linux-arm64")) return "linux-arm64.txt";
-        if (name.includes("linux-x86_64")) return "linux-x86_64.txt";
-        if (name.includes("windows-x64-MDd")) return "windows-x64-MDd.txt";
-        if (name.includes("windows-x64-MD")) return "windows-x64-MD.txt";
+        if (name.includes("linux-arm64-shared")) return "linux-arm64-shared.txt";
+        if (name.includes("linux-arm64-static")) return "linux-arm64-static.txt";
+        if (name.includes("linux-x86_64-shared")) return "linux-x86_64-shared.txt";
+        if (name.includes("linux-x86_64-static")) return "linux-x86_64-static.txt";
+        if (name.includes("windows-x64-MDd-shared")) return "windows-x64-MDd-shared.txt";
+        if (name.includes("windows-x64-MDd-static")) return "windows-x64-MDd-static.txt";
+        if (name.includes("windows-x64-MD-shared")) return "windows-x64-MD-shared.txt";
+        if (name.includes("windows-x64-MD-static")) return "windows-x64-MD-static.txt";
 
         return null;
     }
