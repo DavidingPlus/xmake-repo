@@ -13,3 +13,34 @@ add_repositories("davidingplus " .. xmake_repo)
 
 
 includes("src")
+
+
+task("create-package")
+    set_category("plugin")
+
+    on_run(function()
+        import("core.base.option")
+
+        local contents = option.get("contents") or {}
+        assert(
+            #contents == 1,
+            "usage: xmake create-package <name>"
+        )
+
+        os.execv(
+            "xmake",
+            {
+                "lua",
+                path.join(os.scriptdir(), "scripts/create-package.lua"),
+                contents[1]
+            }
+        )
+    end)
+
+    set_menu {
+        usage = "xmake create-package <name>",
+        description = "Create a new package.",
+        options = {
+            {nil, "contents", "vs", nil, "Package name"}
+        }
+    }

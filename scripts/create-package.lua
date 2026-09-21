@@ -36,8 +36,11 @@ function main(name)
     os.mkdir(package_dir)
     os.mkdir(path.join(package_dir, "versions"))
 
+    local gitkeep_file = path.join(package_dir, "versions", ".gitkeep")
+
     io.writefile(package_file, content)
-    io.writefile(path.join(package_dir, "versions", ".gitkeep"), "")
+    io.writefile(gitkeep_file, "")
 
     print("generated " .. package_file)
+    print("generated " .. gitkeep_file)
 end
