@@ -1,0 +1,35 @@
+name: Unit Test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - "*"
+    tags:
+      - "v*"
+
+jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup XMake
+      uses: xmake-io/github-action-setup-xmake@v1
+      with:
+        xmake-version: latest
+
+    - name: Setup Lua
+      uses: leafo/gh-actions-lua@v13
+      with:
+        luaVersion: "5.4"
+
+    - name: Run LuaUnit
+      working-directory: ${{ github.workspace }}
+      run: xmake luaunit
