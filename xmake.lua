@@ -55,3 +55,33 @@ task("create-package")
             {nil, "contents", "vs", nil, "Package name"}
         }
     }
+
+-- 使用标准 Lua 运行时执行 LuaUnit 测试。LUA 环境变量可用于指定 Lua 可执行文件。
+task("luaunit")
+    set_category("plugin")
+
+    on_run(function()
+        import("lib.detect.find_tool")
+
+        local lua = os.getenv("LUA")
+        if not lua then
+            local lua_tool = find_tool("lua")
+            assert(
+                lua_tool,
+                "Lua runtime was not found; install Lua 5.1+ or set the LUA environment variable."
+            )
+            lua = lua_tool.program
+        end
+
+        os.execv(
+            lua,
+            {
+                path.join(os.projectdir(), "tests", "run.lua")
+            }
+        )
+    end)
+
+    set_menu {
+        usage = "xmake luaunit",
+        description = "Run LuaUnit tests."
+    }
