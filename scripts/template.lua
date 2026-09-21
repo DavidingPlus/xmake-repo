@@ -1,6 +1,10 @@
 package("{{PACKAGE_NAME}}")
     set_description("{{PACKAGE_DESCRIPTION}}")
 
+    -- 如果包依赖其他 XMake 包，请在这里声明，例如：
+    -- add_deps("fmt")
+    {{PACKAGE_DEPS}}
+
     -- XMake 会把内置 shared=false 视为全局默认值并省略。如果直接把 shared 的包默认值改成 true，外层传入的 shared=false 可能会丢失。因此使用独立配置保存包的默认值，再同步给 shared。
     add_configs("build_shared", {
         description = "Build the shared library.",

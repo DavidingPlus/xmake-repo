@@ -13,6 +13,40 @@ local function replace_placeholder(content, name, value)
     end)
 end
 
+-- 读取可选依赖，并把逗号分隔的输入转换成 add_deps("foo", "bar")。
+local function read_dependencies()
+    print("Package dependencies (optional, comma-separated):")
+    local input = io.read()
+
+    if not input or input:match("^%s*$") then
+        return ""
+    end
+
+    local dependencies = {}
+    for dependency in input:gmatch("[^,]+") do
+        dependency = dependency:gsub("^%s+", ""):gsub("%s+$", "")
+
+        -- 禁止引号、反斜杠和换行，避免用户输入破坏生成的 Lua 语法。
+        assert(
+            dependency ~= "" and not dependency:match("[\"\\\r\n]"),
+            "dependency names cannot contain quotes, backslashes or newlines."
+        )
+
+        table.insert(dependencies, dependency)
+    end
+
+    if #dependencies == 0 then
+        return ""
+    end
+
+    local quoted_dependencies = {}
+    for _, dependency in ipairs(dependencies) do
+        table.insert(quoted_dependencies, "\"" .. dependency .. "\"")
+    end
+
+    return "add_deps(" .. table.concat(quoted_dependencies, ", ") .. ")"
+end
+
 function main(name)
     -- 包名同时用于目录名、包名、仓库名和压缩包前缀，因此限制为常见的小写包名格式。
     assert(
@@ -36,11 +70,14 @@ function main(name)
     assert(os.isfile(template_file), "package template does not exist: " .. template_file)
     assert(not os.isfile(package_file), "package file already exists: " .. package_file)
 
+    local package_deps = read_dependencies()
+
     -- 将模板中的元信息占位符替换为当前包名和仓库 owner。
     local content = assert(io.readfile(template_file))
     content = replace_placeholder(content, "PACKAGE_NAME", name)
     content = replace_placeholder(content, "PACKAGE_DESCRIPTION", "The " .. name .. " package")
     content = replace_placeholder(content, "GITHUB_OWNER", github_owner)
+    content = replace_placeholder(content, "PACKAGE_DEPS", package_deps)
 
     -- 同时创建版本摘要文件目录，保证新包可以直接补充版本信息。
     os.mkdir(package_dir)
