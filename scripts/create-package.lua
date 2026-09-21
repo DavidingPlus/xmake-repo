@@ -1,10 +1,10 @@
 -- 根据包名生成 packages/<首字母>/<包名>/xmake.lua。
 --
 -- 用法：
---     xmake l scripts/create-package.lua <name>
+--     xmake create-package <name>
 --
 -- 例如：
---     xmake l scripts/create-package.lua foo
+--     xmake create-package foo
 
 local function replace_placeholder(content, name, value)
     return content:gsub("{{" .. name .. "}}", function()
@@ -18,7 +18,10 @@ function main(name)
         "package name must contain only lowercase letters, digits, '.', '_' or '-'."
     )
 
-    local github_owner = "DavidingPlus"
+    local github_owner = assert(
+        os.getenv("XMAKE_PACKAGE_GITHUB_OWNER"),
+        "github owner is not configured; run `xmake create-package <name>` from the project root."
+    )
 
     local project_dir = path.join(os.scriptdir(), "..")
     local template_file = path.join(os.scriptdir(), "template.lua")
