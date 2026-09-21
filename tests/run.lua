@@ -10,6 +10,6 @@ PROJECT_DIR = project_dir
 
 local luaunit = require("luaunit")
 
-require("test_project")
+require("scripts_test")
 
 os.exit(luaunit.LuaUnit:run())
