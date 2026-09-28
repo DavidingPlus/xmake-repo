@@ -1,3 +1,5 @@
+set_languages("cxx17")
+
 -- Find all directories in the current list directory
 local dirs = os.dirs("*")
 
