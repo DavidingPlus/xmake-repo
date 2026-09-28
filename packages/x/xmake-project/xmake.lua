@@ -58,7 +58,7 @@ package("xmake-project")
             package:addenv("PATH", "bin")
 
             -- 使用方链接的是 Windows DLL，需要让头文件使用 dllimport。
-            package:add("defines", "D_BUILD_SHARED")
+            package:add("defines", "XMAKE_PROJECT_BUILD_SHARED")
         end
     end)
 
