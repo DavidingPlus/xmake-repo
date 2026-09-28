@@ -51,7 +51,7 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
-          branch: update-${{ github.event.client_payload.package }}-${{ github.event.client_payload.version }}
-          title: update ${{ github.event.client_payload.package }} ${{ github.event.client_payload.version }}
+          branch: update-${{ github.event.client_payload.package_name }}-${{ github.event.client_payload.version }}
+          title: update ${{ github.event.client_payload.package_name }} ${{ github.event.client_payload.version }}
           commit-message: update package version
           body: Automated update from release.

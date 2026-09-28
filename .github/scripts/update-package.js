@@ -54,14 +54,15 @@ function updateVersionFile(file, version, digest) {
 }
 
 
-function createPackageIfMissing(packageFile, packageName, dependencies) {
+function createPackageIfMissing(packageFile, metadata) {
     if (fs.existsSync(packageFile)) return;
 
+    const packageName = metadata.package_name;
     console.log(`Package ${packageName} does not exist; creating it.`);
     const result = spawnSync("xmake", [
         "create-package",
         packageName,
-        JSON.stringify(dependencies || {})
+        JSON.stringify(metadata)
     ], {
         encoding: "utf8"
     });
@@ -77,7 +78,7 @@ function createPackageIfMissing(packageFile, packageName, dependencies) {
 
 async function main() {
     const payload = JSON.parse(process.env.CLIENT_PAYLOAD);
-    const packageName = payload.package;
+    const packageName = payload.package_name;
     const sourceRepo = payload.repo.split("/");
     const owner = sourceRepo[0];
     const repo = sourceRepo[1];
@@ -131,7 +132,7 @@ async function main() {
         if (!versionFile) continue;
 
         if (!packageChecked) {
-            createPackageIfMissing(packageFile, packageName, payload.dependencies);
+            createPackageIfMissing(packageFile, payload);
             packageChecked = true;
         }
 
