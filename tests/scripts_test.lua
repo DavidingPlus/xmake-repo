@@ -38,7 +38,7 @@ local function read_file(filename)
     local file = assert(io.open(filename, "rb"))
     local content = file:read("*a")
     file:close()
-    return content
+    return content:gsub("\r\n", "\n")
 end
 
 local function assert_contains(content, expected)
@@ -59,16 +59,29 @@ local function command_succeeded(command)
     return result == true and (code == nil or code == 0)
 end
 
-local function pipe_input(input, command)
-    local producer
-
-    if path_separator == "\\" then
-        producer = input == "" and "echo." or "echo " .. input
-    else
-        producer = 'printf "%s\\n" "' .. input .. '"'
+local function with_stdin_file(input, command, cleanup_files)
+    local inputs = type(input) == "table" and input or {input}
+    -- 用文件提供多次交互回答，避免 Windows cmd 对 echo 管道的解析差异。
+    local input_file = join_path(
+        PROJECT_DIR,
+        "tests",
+        "luaunit_input_" .. os.time() .. "_" .. math.random(100000, 999999) .. ".txt"
+    )
+    local file = assert(io.open(input_file, "wb"))
+    for _, line in ipairs(inputs) do
+        file:write(line, "\n")
     end
+    file:close()
+    table.insert(cleanup_files, input_file)
 
-    return producer .. " | " .. command
+    return command .. ' < "' .. input_file .. '"'
+end
+
+local function quote_argument(value)
+    if path_separator == "\\" then
+        return '"' .. value:gsub('"', '\\"') .. '"'
+    end
+    return "'" .. value:gsub("'", "'\\''") .. "'"
 end
 
 local function remove_directory(directory)
@@ -78,6 +91,18 @@ local function remove_directory(directory)
         command = 'rmdir /s /q "' .. directory .. '" >nul 2>&1'
     else
         command = 'rm -rf -- "' .. directory .. '" >/dev/null 2>&1'
+    end
+
+    os.execute(command)
+end
+
+local function remove_file(filename)
+    local command
+
+    if path_separator == "\\" then
+        command = 'del /q "' .. filename .. '" >nul 2>&1'
+    else
+        command = 'rm -f -- "' .. filename .. '" >/dev/null 2>&1'
     end
 
     os.execute(command)
@@ -102,9 +127,13 @@ TestScripts = {}
 
 function TestScripts:setUp()
     self.generated_package_dirs = {}
+    self.generated_input_files = {}
 end
 
 function TestScripts:tearDown()
+    for _, filename in ipairs(self.generated_input_files) do
+        remove_file(filename)
+    end
     for _, directory in ipairs(self.generated_package_dirs) do
         remove_directory(directory)
     end
@@ -123,6 +152,7 @@ function TestScripts:testPackageTemplateContainsEveryPlaceholder()
     assert_contains(template, "{{PACKAGE_DESCRIPTION}}")
     assert_contains(template, "{{GITHUB_OWNER}}")
     assert_contains(template, "{{PACKAGE_DEPS}}")
+    assert_contains(template, "{{PACKAGE_PLATFORM_DEPS}}")
 end
 
 function TestScripts:testCreatePackageWithDependencies()
@@ -130,9 +160,10 @@ function TestScripts:testCreatePackageWithDependencies()
     local package_dir = package_directory(package_name)
     table.insert(self.generated_package_dirs, package_dir)
 
-    local command = pipe_input(
-        "fmt, spdlog",
-        "xmake create-package " .. package_name
+    local command = with_stdin_file(
+        {"fmt, spdlog", "windows-lib", "linux-lib"},
+        "xmake create-package " .. package_name,
+        self.generated_input_files
     )
     luaunit.assertTrue(command_succeeded(command), "create-package command failed")
 
@@ -147,9 +178,49 @@ function TestScripts:testCreatePackageWithDependencies()
     assert_contains(generated, 'package("' .. package_name .. '")')
     assert_contains(generated, 'set_description("The ' .. package_name .. ' package")')
     assert_contains(generated, 'add_deps("fmt", "spdlog")')
+    assert_contains(generated, 'if is_plat("windows") then\n        add_deps("windows-lib")\n    end')
+    assert_contains(generated, 'if is_plat("linux") then\n        add_deps("linux-lib")\n    end')
+    assert_contains(generated, "on_load(function(package)")
+    luaunit.assertNil(generated:find('package:add("deps"', 1, true))
+    local on_load_position = generated:find("on_load(function(package)", 1, true)
+    luaunit.assertTrue(
+        generated:find('add_deps("fmt", "spdlog")', 1, true) < on_load_position
+    )
+    luaunit.assertTrue(
+        generated:find('add_deps("windows-lib")', 1, true) < on_load_position
+    )
     assert_contains(generated, "github.com/DavidingPlus/" .. package_name)
     assert_contains(generated, package_name .. "-v$(version)-")
     luaunit.assertNil(generated:find("{{", 1, true))
+end
+
+function TestScripts:testCreatePackageWithDependencyJsonArgument()
+    local package_name = new_package_name()
+    local package_dir = package_directory(package_name)
+    table.insert(self.generated_package_dirs, package_dir)
+
+    local dependencies = '{"common":["fmt"],"windows":["windows-lib"],"linux":["linux-lib"]}'
+    local command = "xmake create-package " .. package_name .. " " .. quote_argument(dependencies)
+    luaunit.assertTrue(command_succeeded(command), "create-package JSON argument failed")
+
+    local generated = read_file(join_path(package_dir, "xmake.lua"))
+    assert_contains(generated, 'add_deps("fmt")')
+    assert_contains(generated, 'if is_plat("windows") then\n        add_deps("windows-lib")\n    end')
+    assert_contains(generated, 'if is_plat("linux") then\n        add_deps("linux-lib")\n    end')
+end
+
+function TestScripts:testCreatePackageRejectsInvalidDependencyJson()
+    local package_name = new_package_name()
+    local package_dir = package_directory(package_name)
+    table.insert(self.generated_package_dirs, package_dir)
+
+    local dependencies = '{"common":"fmt"}'
+    local command = "xmake create-package " .. package_name .. " " .. quote_argument(dependencies)
+    luaunit.assertFalse(
+        command_succeeded(command),
+        "create-package accepted a dependency group that was not an array"
+    )
+    luaunit.assertFalse(file_exists(join_path(package_dir, "xmake.lua")))
 end
 
 function TestScripts:testCreatePackageWithoutDependencies()
@@ -157,13 +228,19 @@ function TestScripts:testCreatePackageWithoutDependencies()
     local package_dir = package_directory(package_name)
     table.insert(self.generated_package_dirs, package_dir)
 
-    local command = pipe_input("", "xmake create-package " .. package_name)
+    local command = with_stdin_file(
+        {"", "", ""},
+        "xmake create-package " .. package_name,
+        self.generated_input_files
+    )
     luaunit.assertTrue(command_succeeded(command), "create-package command failed")
 
     local generated = read_file(join_path(package_dir, "xmake.lua"))
 
     -- 模板中的示例注释可以保留，但不应生成真正的 add_deps 调用。
     luaunit.assertNil(generated:find("\n    add_deps(", 1, true))
+    luaunit.assertNil(generated:find('\n    if is_plat("windows") then', 1, true))
+    luaunit.assertNil(generated:find('\n    if is_plat("linux") then', 1, true))
 end
 
 function TestScripts:testCreatePackageUsesFirstCharacterAsDirectory()
@@ -172,7 +249,11 @@ function TestScripts:testCreatePackageUsesFirstCharacterAsDirectory()
     table.insert(self.generated_package_dirs, package_dir)
 
     luaunit.assertTrue(
-        command_succeeded(pipe_input("fmt", "xmake create-package " .. package_name)),
+        command_succeeded(with_stdin_file(
+            {"fmt", "", ""},
+            "xmake create-package " .. package_name,
+            self.generated_input_files
+        )),
         "create-package command failed"
     )
     luaunit.assertTrue(file_exists(join_path(package_dir, "xmake.lua")))
@@ -207,7 +288,11 @@ function TestScripts:testCreatePackageRejectsEmptyDependencyEntries()
 
     luaunit.assertFalse(
         command_succeeded(
-            pipe_input("fmt, ,spdlog", "xmake create-package " .. package_name)
+            with_stdin_file(
+                "fmt, ,spdlog",
+                "xmake create-package " .. package_name,
+                self.generated_input_files
+            )
         )
     )
     luaunit.assertFalse(file_exists(join_path(package_directory(package_name), "xmake.lua")))
@@ -218,7 +303,11 @@ function TestScripts:testCreatePackageRejectsBackslashInDependencyName()
 
     luaunit.assertFalse(
         command_succeeded(
-            pipe_input("fmt, bad\\dependency", "xmake create-package " .. package_name)
+            with_stdin_file(
+                "fmt, bad\\dependency",
+                "xmake create-package " .. package_name,
+                self.generated_input_files
+            )
         )
     )
     luaunit.assertFalse(file_exists(join_path(package_directory(package_name), "xmake.lua")))
@@ -230,12 +319,20 @@ function TestScripts:testCreatePackageRefusesToOverwriteExistingPackage()
     table.insert(self.generated_package_dirs, package_dir)
 
     luaunit.assertTrue(
-        command_succeeded(pipe_input("fmt", "xmake create-package " .. package_name)),
+        command_succeeded(with_stdin_file(
+            {"fmt", "", ""},
+            "xmake create-package " .. package_name,
+            self.generated_input_files
+        )),
         "initial package generation failed"
     )
 
     luaunit.assertFalse(
-        command_succeeded(pipe_input("fmt", "xmake create-package " .. package_name)),
+        command_succeeded(with_stdin_file(
+            {"fmt", "", ""},
+            "xmake create-package " .. package_name,
+            self.generated_input_files
+        )),
         "existing package was overwritten"
     )
 
