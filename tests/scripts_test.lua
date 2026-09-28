@@ -109,7 +109,7 @@ local function remove_file(filename)
 end
 
 local function new_package_name()
-    return "luaunit_test_" .. os.time() .. "_" .. math.random(100000, 999999)
+    return "luaunit-test-" .. os.time() .. "-" .. math.random(100000, 999999)
 end
 
 local function package_directory(package_name)
@@ -153,6 +153,7 @@ function TestScripts:testPackageTemplateContainsEveryPlaceholder()
     assert_contains(template, "{{GITHUB_OWNER}}")
     assert_contains(template, "{{PACKAGE_DEPS}}")
     assert_contains(template, "{{PACKAGE_PLATFORM_DEPS}}")
+    assert_contains(template, "{{MACRO_PREFIX}}")
 end
 
 function TestScripts:testCreatePackageWithDependencies()
@@ -161,7 +162,7 @@ function TestScripts:testCreatePackageWithDependencies()
     table.insert(self.generated_package_dirs, package_dir)
 
     local command = with_stdin_file(
-        {"fmt, spdlog", "windows-lib", "linux-lib"},
+        {"", "fmt, spdlog", "windows-lib", "linux-lib"},
         "xmake create-package " .. package_name,
         self.generated_input_files
     )
@@ -194,28 +195,59 @@ function TestScripts:testCreatePackageWithDependencies()
     luaunit.assertNil(generated:find("{{", 1, true))
 end
 
-function TestScripts:testCreatePackageWithDependencyJsonArgument()
+function TestScripts:testCreatePackageWithPackageMetadataJsonArgument()
     local package_name = new_package_name()
     local package_dir = package_directory(package_name)
     table.insert(self.generated_package_dirs, package_dir)
 
-    local dependencies = '{"common":["fmt"],"windows":["windows-lib"],"linux":["linux-lib"]}'
-    local command = "xmake create-package " .. package_name .. " " .. quote_argument(dependencies)
+    local macro_prefix = "DLOG"
+    local metadata = '{"package_name":"' .. package_name .. '","macro_prefix":"' .. macro_prefix .. '","dependencies":{"common":["fmt"],"windows":["windows-lib"],"linux":["linux-lib"]}}'
+    local command = "xmake create-package " .. package_name .. " " .. quote_argument(metadata)
     luaunit.assertTrue(command_succeeded(command), "create-package JSON argument failed")
 
     local generated = read_file(join_path(package_dir, "xmake.lua"))
     assert_contains(generated, 'add_deps("fmt")')
+    assert_contains(generated, 'package:add("defines", "' .. macro_prefix .. '_BUILD_SHARED")')
+    luaunit.assertNil(generated:find("{{MACRO_PREFIX}}", 1, true))
     assert_contains(generated, 'if is_plat("windows") then\n        add_deps("windows-lib")\n    end')
     assert_contains(generated, 'if is_plat("linux") then\n        add_deps("linux-lib")\n    end')
 end
 
-function TestScripts:testCreatePackageRejectsInvalidDependencyJson()
+function TestScripts:testCreatePackageRejectsMismatchedMetadataPackageName()
     local package_name = new_package_name()
     local package_dir = package_directory(package_name)
     table.insert(self.generated_package_dirs, package_dir)
 
-    local dependencies = '{"common":"fmt"}'
-    local command = "xmake create-package " .. package_name .. " " .. quote_argument(dependencies)
+    local metadata = '{"package_name":"different-package","macro_prefix":"DLOG","dependencies":{"common":[],"windows":[],"linux":[]}}'
+    local command = "xmake create-package " .. package_name .. " " .. quote_argument(metadata)
+    luaunit.assertFalse(
+        command_succeeded(command),
+        "create-package accepted metadata for a different package"
+    )
+    luaunit.assertFalse(file_exists(join_path(package_dir, "xmake.lua")))
+end
+
+function TestScripts:testCreatePackageRejectsInvalidMetadataMacroPrefix()
+    local package_name = new_package_name()
+    local package_dir = package_directory(package_name)
+    table.insert(self.generated_package_dirs, package_dir)
+
+    local metadata = '{"package_name":"' .. package_name .. '","macro_prefix":"dlog","dependencies":{"common":[],"windows":[],"linux":[]}}'
+    local command = "xmake create-package " .. package_name .. " " .. quote_argument(metadata)
+    luaunit.assertFalse(
+        command_succeeded(command),
+        "create-package accepted a lowercase macro prefix"
+    )
+    luaunit.assertFalse(file_exists(join_path(package_dir, "xmake.lua")))
+end
+
+function TestScripts:testCreatePackageRejectsInvalidPackageMetadataJson()
+    local package_name = new_package_name()
+    local package_dir = package_directory(package_name)
+    table.insert(self.generated_package_dirs, package_dir)
+
+    local metadata = '{"package_name":"' .. package_name .. '","macro_prefix":"' .. package_name:upper():gsub("%-", "_") .. '","dependencies":{"common":"fmt"}}'
+    local command = "xmake create-package " .. package_name .. " " .. quote_argument(metadata)
     luaunit.assertFalse(
         command_succeeded(command),
         "create-package accepted a dependency group that was not an array"
@@ -229,7 +261,7 @@ function TestScripts:testCreatePackageWithoutDependencies()
     table.insert(self.generated_package_dirs, package_dir)
 
     local command = with_stdin_file(
-        {"", "", ""},
+        {"", "", "", ""},
         "xmake create-package " .. package_name,
         self.generated_input_files
     )
@@ -244,13 +276,13 @@ function TestScripts:testCreatePackageWithoutDependencies()
 end
 
 function TestScripts:testCreatePackageUsesFirstCharacterAsDirectory()
-    local package_name = "zluaunit-test." .. os.time() .. "_" .. math.random(100000, 999999)
+    local package_name = "zluaunit-test-" .. os.time() .. "-" .. math.random(100000, 999999)
     local package_dir = package_directory(package_name)
     table.insert(self.generated_package_dirs, package_dir)
 
     luaunit.assertTrue(
         command_succeeded(with_stdin_file(
-            {"fmt", "", ""},
+            {"", "fmt", "", ""},
             "xmake create-package " .. package_name,
             self.generated_input_files
         )),
@@ -289,7 +321,7 @@ function TestScripts:testCreatePackageRejectsEmptyDependencyEntries()
     luaunit.assertFalse(
         command_succeeded(
             with_stdin_file(
-                "fmt, ,spdlog",
+                {"", "fmt, ,spdlog"},
                 "xmake create-package " .. package_name,
                 self.generated_input_files
             )
@@ -304,7 +336,7 @@ function TestScripts:testCreatePackageRejectsBackslashInDependencyName()
     luaunit.assertFalse(
         command_succeeded(
             with_stdin_file(
-                "fmt, bad\\dependency",
+                {"", "fmt, bad\\dependency"},
                 "xmake create-package " .. package_name,
                 self.generated_input_files
             )
@@ -320,7 +352,7 @@ function TestScripts:testCreatePackageRefusesToOverwriteExistingPackage()
 
     luaunit.assertTrue(
         command_succeeded(with_stdin_file(
-            {"fmt", "", ""},
+            {"", "fmt", "", ""},
             "xmake create-package " .. package_name,
             self.generated_input_files
         )),
@@ -329,7 +361,7 @@ function TestScripts:testCreatePackageRefusesToOverwriteExistingPackage()
 
     luaunit.assertFalse(
         command_succeeded(with_stdin_file(
-            {"fmt", "", ""},
+            {"", "fmt", "", ""},
             "xmake create-package " .. package_name,
             self.generated_input_files
         )),

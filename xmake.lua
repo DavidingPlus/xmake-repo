@@ -19,13 +19,15 @@ add_repositories("davidingplus " .. xmake_repo)
 includes("src")
 
 
--- 注册 `xmake create-package <name> [dependencies-json]` 命令，用于生成新包。
+-- 注册 xmake create-package <name> [package-metadata-json] 命令，用于生成新包。
 -- 用法：
 --     xmake create-package <name>
---     xmake create-package <name> '<dependencies-json>'
+--     xmake create-package <name> '<package-metadata-json>'
+--     xmake create-package foo
+--     xmake create-package foo '{\"package_name\":\"foo\",\"macro_prefix\":\"FOO\",\"dependencies\":{\"common\":[\"fmt\"],\"windows\":[],\"linux\":[]}}'
 --
--- 手动创建时会依次询问 common、windows、linux 依赖；每项可留空。
--- 自动创建时可把三组依赖作为第二个参数传入 JSON。
+-- 手动创建时依次询问宏前缀、通用依赖、Windows 依赖和 Linux 依赖；宏前缀留空时按包名推导。
+-- 自动创建时将 dlog 生成的 package-metadata.json 内容（注意是 json 字符串内容而不是 json 路径）作为第二个参数传入。
 task("create-package")
     set_category("plugin")
 
@@ -36,7 +38,7 @@ task("create-package")
         local contents = option.get("contents") or {}
         assert(
             #contents == 1 or #contents == 2,
-            "usage: xmake create-package <name> [dependencies-json]"
+            "usage: xmake create-package <name> [package-metadata-json]"
         )
 
         -- 通过环境变量把根配置中的 owner 传给子进程，避免生成脚本重复写死。
@@ -54,7 +56,7 @@ task("create-package")
 
     -- set_menu 让 task 可以直接从命令行调用。
     set_menu {
-        usage = "xmake create-package <name> [dependencies-json]",
+        usage = "xmake create-package <name> [package-metadata-json]",
         description = "Create a new package.",
         options = {
             {nil, "contents", "vs", nil, "Package name"}

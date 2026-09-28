@@ -2,12 +2,12 @@
 --
 -- 用法：
 --     xmake create-package <name>
---     xmake create-package <name> '<dependencies-json>'
---
--- 手动创建时会依次询问 common、windows、linux 依赖；每项可留空。
--- 自动创建时可把三组依赖作为第二个参数传入 JSON。
--- 例如：
+--     xmake create-package <name> '<package-metadata-json>'
 --     xmake create-package foo
+--     xmake create-package foo '{\"package_name\":\"foo\",\"macro_prefix\":\"FOO\",\"dependencies\":{\"common\":[\"fmt\"],\"windows\":[],\"linux\":[]}}'
+--
+-- 手动创建时依次询问宏前缀、通用依赖、Windows 依赖和 Linux 依赖；宏前缀留空时按包名推导。
+-- 自动创建时将 dlog 生成的 package-metadata.json 内容（注意是 json 字符串内容而不是 json 路径）作为第二个参数传入。
 
 -- 使用回调形式替换占位符，避免替换值中的 '%' 被 gsub 当成特殊字符处理。
 local function replace_placeholder(content, name, value)
@@ -18,52 +18,83 @@ end
 
 -- 手动执行时按平台询问依赖；自动创建时由命令行 JSON 参数提供分组依赖。
 local function read_dependencies(platform)
-    print(platform:sub(1, 1):upper() .. platform:sub(2)
-        .. " dependencies (optional, comma-separated; press Enter for none):")
+    local platform_names = {common = "跨平台通用", windows = " Windows ", linux = " Linux "}
+    print("请输入" .. platform_names[platform] .. "依赖（可选，多个依赖用英文逗号分隔；直接回车表示无依赖）：")
+    io.flush()
     local input = io.read()
     local dependencies = {}
     for dependency in (input or ""):gmatch("[^,]+") do
         dependency = dependency:gsub("^%s+", ""):gsub("%s+$", "")
-
-        -- 禁止引号、反斜杠和换行，避免用户输入破坏生成的 Lua 语法。
         assert(
             dependency ~= "" and not dependency:match("[\"\\\r\n]"),
-            "dependency names cannot contain quotes, backslashes or newlines."
+            "依赖项不能包含引号、反斜杠或换行符。"
         )
-
         table.insert(dependencies, dependency)
     end
-
     return dependencies
 end
 
-local function read_dependency_groups(dependencies_json)
+local function default_macro_prefix(package_name)
+    return package_name:upper():gsub("%-", "_")
+end
+
+local function read_macro_prefix(package_name)
+    local default = default_macro_prefix(package_name)
+    print("请输入宏前缀（直接回车使用默认值：" .. default .. "）：")
+    io.flush()
+    local macro_prefix = io.read() or ""
+    macro_prefix = macro_prefix:gsub("^%s+", ""):gsub("%s+$", "")
+    if macro_prefix == "" then
+        return default
+    end
+
+    assert(
+        macro_prefix:match("^[A-Z][A-Z0-9_]*$"),
+        "宏前缀只能包含大写英文字母、数字和下划线，且需以大写字母开头。"
+    )
+    return macro_prefix
+end
+
+local function read_package_configuration(metadata_json, package_name)
     local groups
-    if dependencies_json then
+    local macro_prefix
+    if metadata_json then
         import("core.base.json")
-        groups = json.decode(dependencies_json)
+        local metadata = json.decode(metadata_json)
+        assert(type(metadata) == "table", "元数据必须是 JSON 对象。")
+        assert(metadata.package_name == package_name, "元数据中的 package_name 必须与命令行包名一致。")
+
+        groups = metadata.dependencies
+        macro_prefix = metadata.macro_prefix
+        assert(
+            type(macro_prefix) == "string"
+                and macro_prefix:match("^[A-Z][A-Z0-9_]*$"),
+            "元数据中的 macro_prefix 必须是合法的大写宏前缀。"
+        )
     else
+        -- 包名通过命令行提供；接下来依次询问宏前缀和三组依赖。
+        macro_prefix = read_macro_prefix(package_name)
         groups = {}
         groups.common = read_dependencies("common")
         groups.windows = read_dependencies("windows")
         groups.linux = read_dependencies("linux")
     end
 
-    assert(type(groups) == "table", "dependencies must be a JSON object")
+    assert(type(groups) == "table", "元数据中的 dependencies 必须是 JSON 对象。")
     for _, platform in ipairs({"common", "windows", "linux"}) do
         local dependencies = groups[platform] or {}
-        assert(type(dependencies) == "table", "dependencies." .. platform .. " must be an array")
+        assert(type(dependencies) == "table", "依赖分组必须是数组：" .. platform)
         for _, dependency in ipairs(dependencies) do
             assert(
                 type(dependency) == "string"
                     and dependency ~= ""
                     and not dependency:match("[,\"\\\r\n]"),
-                "invalid dependency in " .. platform
+                "依赖项无效：" .. platform
             )
         end
         groups[platform] = dependencies
     end
-    return groups
+    return groups, macro_prefix
 end
 
 local function format_common_dependencies(dependencies)
@@ -92,17 +123,21 @@ local function format_platform_dependencies(platform_dependencies)
     return table.concat(lines, "\n    ")
 end
 
-function main(name, dependencies_json)
-    -- 包名同时用于目录名、包名、仓库名和压缩包前缀，因此限制为常见的小写包名格式。
+function main(name, metadata_json)
+    -- 规定包名使用小写字母和数字，单词之间用单个连字符（-）分隔。
     assert(
-        name and name:match("^[a-z0-9][a-z0-9%._%-]*$"),
-        "package name must contain only lowercase letters, digits, '.', '_' or '-'."
+        type(name) == "string"
+            and name:match("^[a-z][a-z0-9%-]*$")
+            and name:sub(1, 1) ~= "-"
+            and name:sub(-1) ~= "-"
+            and not name:find("--", 1, true),
+        "包名必须以小写字母开头，并使用小写字母、数字和单个连字符分隔单词。"
     )
 
     -- owner 由根目录 xmake.lua 通过环境变量传入，用户命令只需要提供 name。
     local github_owner = assert(
         os.getenv("XMAKE_PACKAGE_GITHUB_OWNER"),
-        "github owner is not configured; run `xmake create-package <name>` from the project root."
+        "尚未配置 GitHub owner，请从项目根目录运行 xmake create-package。"
     )
 
     -- 脚本位于 scripts/，生成结果放回仓库根目录下的 packages/<首字母>/<包名>/。
@@ -112,16 +147,18 @@ function main(name, dependencies_json)
     local package_file = path.join(package_dir, "xmake.lua")
 
     -- 生成前先检查模板，并拒绝覆盖已有包配方。
-    assert(os.isfile(template_file), "package template does not exist: " .. template_file)
-    assert(not os.isfile(package_file), "package file already exists: " .. package_file)
+    assert(os.isfile(template_file), "包模板不存在：" .. template_file)
+    assert(not os.isfile(package_file), "包配置已存在，拒绝覆盖：" .. package_file)
 
-    local dependencies = read_dependency_groups(dependencies_json)
+    local dependencies, macro_prefix = read_package_configuration(metadata_json, name)
     local package_deps = format_common_dependencies(dependencies.common)
     local package_platform_deps = format_platform_dependencies(dependencies)
 
     -- 将模板中的元信息占位符替换为当前包名和仓库 owner。
     local content = assert(io.readfile(template_file))
     content = replace_placeholder(content, "PACKAGE_NAME", name)
+    -- 使用完整元数据中的 macro_prefix 填充包模板。
+    content = replace_placeholder(content, "MACRO_PREFIX", macro_prefix)
     content = replace_placeholder(content, "PACKAGE_DESCRIPTION", "The " .. name .. " package")
     content = replace_placeholder(content, "GITHUB_OWNER", github_owner)
     content = replace_placeholder(content, "PACKAGE_DEPS", package_deps)
@@ -137,6 +174,6 @@ function main(name, dependencies_json)
     io.writefile(package_file, content)
     io.writefile(gitkeep_file, "")
 
-    print("generated " .. package_file)
-    print("generated " .. gitkeep_file)
+    print("已生成包配置：" .. package_file)
+    print("已生成版本目录占位文件：" .. gitkeep_file)
 end
