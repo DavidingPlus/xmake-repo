@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { spawnSync } = require("child_process");
 
 
 function updateVersionFile(file, version, digest) {
@@ -53,6 +54,27 @@ function updateVersionFile(file, version, digest) {
 }
 
 
+function createPackageIfMissing(packageFile, packageName, dependencies) {
+    if (fs.existsSync(packageFile)) return;
+
+    console.log(`Package ${packageName} does not exist; creating it.`);
+    const result = spawnSync("xmake", [
+        "create-package",
+        packageName,
+        JSON.stringify(dependencies || {})
+    ], {
+        encoding: "utf8"
+    });
+
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.stderr) process.stderr.write(result.stderr);
+    if (result.error) throw result.error;
+    if (result.status !== 0) {
+        throw new Error(`xmake create-package failed with status ${result.status}`);
+    }
+}
+
+
 async function main() {
     const payload = JSON.parse(process.env.CLIENT_PAYLOAD);
     const packageName = payload.package;
@@ -83,16 +105,10 @@ async function main() {
             tag
         });
 
-    /*
-     * versions 目录。
-     */
-    const versionDir =
-        path.join(
-            "packages",
-            packageName[0],
-            packageName,
-            "versions"
-        );
+    const packageDir = path.join("packages", packageName[0], packageName);
+    const packageFile = path.join(packageDir, "xmake.lua");
+    const versionDir = path.join(packageDir, "versions");
+    let packageChecked = false;
 
     /*
      * asset 名称映射。
@@ -113,6 +129,11 @@ async function main() {
     for (const asset of release.data.assets) {
         const versionFile = getVersionFile(asset.name);
         if (!versionFile) continue;
+
+        if (!packageChecked) {
+            createPackageIfMissing(packageFile, packageName, payload.dependencies);
+            packageChecked = true;
+        }
 
         const digest = asset.digest.replace(
             "sha256:",

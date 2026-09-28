@@ -17,6 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup XMake
+        uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: latest
+
       - name: Setup Node
         uses: actions/setup-node@v4
 
@@ -27,6 +32,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CLIENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+          CI_XMAKE_REPO: ${{ github.workspace }}
         run: node .github/scripts/update-package.js
 
       - name: Check changes

@@ -2,7 +2,10 @@
 --
 -- 用法：
 --     xmake create-package <name>
+--     xmake create-package <name> '<dependencies-json>'
 --
+-- 手动创建时会依次询问 common、windows、linux 依赖；每项可留空。
+-- 自动创建时可把三组依赖作为第二个参数传入 JSON。
 -- 例如：
 --     xmake create-package foo
 
@@ -13,17 +16,13 @@ local function replace_placeholder(content, name, value)
     end)
 end
 
--- 读取可选依赖，并把逗号分隔的输入转换成 add_deps("foo", "bar")。
-local function read_dependencies()
-    print("Package dependencies (optional, comma-separated):")
+-- 手动执行时按平台询问依赖；自动创建时由命令行 JSON 参数提供分组依赖。
+local function read_dependencies(platform)
+    print(platform:sub(1, 1):upper() .. platform:sub(2)
+        .. " dependencies (optional, comma-separated; press Enter for none):")
     local input = io.read()
-
-    if not input or input:match("^%s*$") then
-        return ""
-    end
-
     local dependencies = {}
-    for dependency in input:gmatch("[^,]+") do
+    for dependency in (input or ""):gmatch("[^,]+") do
         dependency = dependency:gsub("^%s+", ""):gsub("%s+$", "")
 
         -- 禁止引号、反斜杠和换行，避免用户输入破坏生成的 Lua 语法。
@@ -35,19 +34,65 @@ local function read_dependencies()
         table.insert(dependencies, dependency)
     end
 
-    if #dependencies == 0 then
-        return ""
+    return dependencies
+end
+
+local function read_dependency_groups(dependencies_json)
+    local groups
+    if dependencies_json then
+        import("core.base.json")
+        groups = json.decode(dependencies_json)
+    else
+        groups = {}
+        groups.common = read_dependencies("common")
+        groups.windows = read_dependencies("windows")
+        groups.linux = read_dependencies("linux")
     end
 
+    assert(type(groups) == "table", "dependencies must be a JSON object")
+    for _, platform in ipairs({"common", "windows", "linux"}) do
+        local dependencies = groups[platform] or {}
+        assert(type(dependencies) == "table", "dependencies." .. platform .. " must be an array")
+        for _, dependency in ipairs(dependencies) do
+            assert(
+                type(dependency) == "string"
+                    and dependency ~= ""
+                    and not dependency:match("[,\"\\\r\n]"),
+                "invalid dependency in " .. platform
+            )
+        end
+        groups[platform] = dependencies
+    end
+    return groups
+end
+
+local function format_common_dependencies(dependencies)
+    if #dependencies == 0 then return "" end
     local quoted_dependencies = {}
     for _, dependency in ipairs(dependencies) do
         table.insert(quoted_dependencies, "\"" .. dependency .. "\"")
     end
-
     return "add_deps(" .. table.concat(quoted_dependencies, ", ") .. ")"
 end
 
-function main(name)
+local function format_platform_dependencies(platform_dependencies)
+    local lines = {}
+    for _, platform in ipairs({"windows", "linux"}) do
+        local dependencies = platform_dependencies[platform]
+        if #dependencies > 0 then
+            local quoted_dependencies = {}
+            for _, dependency in ipairs(dependencies) do
+                table.insert(quoted_dependencies, '"' .. dependency .. '"')
+            end
+            table.insert(lines, 'if is_plat("' .. platform .. '") then')
+            table.insert(lines, "    add_deps(" .. table.concat(quoted_dependencies, ", ") .. ")")
+            table.insert(lines, "end")
+        end
+    end
+    return table.concat(lines, "\n    ")
+end
+
+function main(name, dependencies_json)
     -- 包名同时用于目录名、包名、仓库名和压缩包前缀，因此限制为常见的小写包名格式。
     assert(
         name and name:match("^[a-z0-9][a-z0-9%._%-]*$"),
@@ -70,7 +115,9 @@ function main(name)
     assert(os.isfile(template_file), "package template does not exist: " .. template_file)
     assert(not os.isfile(package_file), "package file already exists: " .. package_file)
 
-    local package_deps = read_dependencies()
+    local dependencies = read_dependency_groups(dependencies_json)
+    local package_deps = format_common_dependencies(dependencies.common)
+    local package_platform_deps = format_platform_dependencies(dependencies)
 
     -- 将模板中的元信息占位符替换为当前包名和仓库 owner。
     local content = assert(io.readfile(template_file))
@@ -78,6 +125,7 @@ function main(name)
     content = replace_placeholder(content, "PACKAGE_DESCRIPTION", "The " .. name .. " package")
     content = replace_placeholder(content, "GITHUB_OWNER", github_owner)
     content = replace_placeholder(content, "PACKAGE_DEPS", package_deps)
+    content = replace_placeholder(content, "PACKAGE_PLATFORM_DEPS", package_platform_deps)
 
     -- 同时创建版本摘要文件目录，保证新包可以直接补充版本信息。
     os.mkdir(package_dir)
