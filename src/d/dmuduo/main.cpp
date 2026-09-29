@@ -134,8 +134,8 @@ int main(int argc, char **argv)
 
     std::thread serverThread([&]()
                              {
-                                 EventLoop loop;
-                                 InetAddress addr(port);
+                                 dmuduo::EventLoop loop;
+                                 dmuduo::InetAddress addr(port);
 
                                  // 该服务端会在“所有预期客户端都连接过且全部断开”后自动退出。
                                  AutoQuitEchoServer server(&loop, addr, "EchoServerDemo2", clientCount);

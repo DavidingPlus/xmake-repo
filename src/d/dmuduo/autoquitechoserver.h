@@ -6,19 +6,19 @@
 #include "baseechoserver.h"
 
 
-// AutoQuitEchoServer 在 BaseEchoServer 的基础上增加“自动退出”语义：当累计接待的客户端数量达到 expectedClients，且当前已无存活连接时，服务端会在所属 EventLoop 中排队执行 quit()，用于测试这类场景。
+// AutoQuitEchoServer 在 BaseEchoServer 的基础上增加“自动退出”语义：当累计接待的客户端数量达到 expectedClients，且当前已无存活连接时，服务端会在所属 dmuduo::EventLoop 中排队执行 quit()，用于测试这类场景。
 class AutoQuitEchoServer : public BaseEchoServer
 {
 
 public:
 
-    AutoQuitEchoServer(EventLoop *loop, const InetAddress &addr, const std::string &name, int expectedClients, int threadNum = 3) : BaseEchoServer(loop, addr, name, threadNum), m_expectedClients(expectedClients) {}
+    AutoQuitEchoServer(dmuduo::EventLoop *loop, const dmuduo::InetAddress &addr, const std::string &name, int expectedClients, int threadNum = 3) : BaseEchoServer(loop, addr, name, threadNum), m_expectedClients(expectedClients) {}
 
 
 protected:
 
     // 复用基类日志，再叠加连接计数和自动退出逻辑。
-    void onConnection(const TcpConnectionPtr &conn) override;
+    void onConnection(const dmuduo::TcpConnectionPtr &conn) override;
 
 
 private:
