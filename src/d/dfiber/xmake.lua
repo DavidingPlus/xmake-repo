@@ -3,10 +3,10 @@ if is_plat("windows") then
     return
 end
 
-add_requires("coroutine")
+add_requires("dfiber")
 
-target("coroutine")
+target("dfiber")
     set_kind("binary")
     add_files("main.cpp")
-    add_packages("coroutine")
+    add_packages("dfiber")
 target_end()
