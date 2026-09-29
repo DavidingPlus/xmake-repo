@@ -5,9 +5,9 @@
 
 int main()
 {
-    std::cout << LTest::foo() << std::endl;
+    std::cout << xmake_project::LTest::foo() << std::endl;
 
-    auto p = LTest().gee(3, 4);
+    auto p = xmake_project::LTest().gee(3, 4);
 
     std::cout << p.first << std::endl;
     std::cout << p.second << std::endl;
