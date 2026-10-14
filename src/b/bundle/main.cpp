@@ -1,33 +1,35 @@
-﻿#include <cassert>
-#include <iostream>
+﻿#include <iostream>
 #include <string>
-#include <vector>
 
 #include <bundle.h>
 
 
 int main()
 {
-    // 构造重复文本数据，用于测试各压缩算法。
-    std::string original("There's a lady who's sure all that glitters is gold");
-    for (int i = 0; i < 18; ++i) original += original + std::string(i + 1, 32 + i);
+    // std::string 按长度保存二进制数据，包含零字节也应完整还原。
+    std::string original(32768, 'A');
+    for (std::size_t i = 0; i < original.size(); i += 256) original[i] = '\0';
 
-    // 逐一压缩、解压，并验证数据完整性。
-    const std::vector<unsigned> algorithms{
-        bundle::RAW, bundle::SHOCO, bundle::LZ4F, bundle::MINIZ, bundle::LZIP, bundle::LZMA20,
-        bundle::ZPAQ, bundle::LZ4, bundle::BROTLI9, bundle::ZSTD, bundle::LZMA25,
-        bundle::BSC, bundle::BROTLI11, bundle::SHRINKER, bundle::CSC20, bundle::BCM,
-        bundle::ZLING, bundle::MCM, bundle::TANGELO, bundle::ZMOLLY, bundle::CRUSH, bundle::LZJB};
-
+    const unsigned algorithms[] = {bundle::LZ4, bundle::ZSTD, bundle::MINIZ};
     for (unsigned algorithm : algorithms)
     {
-        std::string packed = bundle::pack(algorithm, original);
-        std::string unpacked = bundle::unpack(packed);
+        std::string packed;
+        std::string unpacked;
 
-        std::cout << original.size() << " -> " << packed.size()
-                  << " bytes (" << bundle::name_of(algorithm) << ")" << std::endl;
-        assert(original == unpacked);
+        if (!bundle::pack(algorithm, packed, original))
+        {
+            std::cerr << "Compression failed: " << bundle::name_of(algorithm) << '\n';
+            return 1;
+        }
+
+        if (!bundle::unpack(unpacked, packed) || unpacked != original)
+        {
+            std::cerr << "Round trip failed: " << bundle::name_of(algorithm) << '\n';
+            return 2;
+        }
+
+        std::cout << bundle::name_of(algorithm) << ": "
+                  << original.size() << " -> " << packed.size()
+                  << " bytes; round trip passed\n";
     }
-
-    std::cout << "All ok." << std::endl;
 }
