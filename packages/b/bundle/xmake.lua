@@ -23,8 +23,9 @@ package("bundle")
 
     on_install(function (package)
         -- 将内置 MCM 的旧类型别名改为标准名称，避免依赖 MSVC 扩展。
-        io.replace("bundle.cpp", "std::ios_base::open_mode",
-                   "std::ios_base::openmode", {plain = true})
+        io.replace("bundle.cpp", "std::ios_base::open_mode", "std::ios_base::openmode", {plain = true})
+        -- clear_err 会修改成员状态，不能声明为 const；兼容 GCC 14 的模板检查。
+        io.replace("bundle.cpp", "forceinline void clear_err() const", "forceinline void clear_err()", {plain = true})
 
         -- 上游没有 xmake.lua，安装时生成脚本，仅使用根目录的合并源码。
         io.writefile("xmake.lua", [[
