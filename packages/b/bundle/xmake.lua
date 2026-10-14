@@ -51,6 +51,8 @@ package("bundle")
                 -- 内置 MCM 依赖 x86 的 SSE/SSE2 指令，ARM64 构建时禁用。
                 if is_arch("arm64") then
                     add_defines("BUNDLE_NO_MCM")
+                    -- 内置 ZPAQ 的模型字节表含负值，保持其对有符号 char 的假设。
+                    add_cxxflags("-fsigned-char", {tools = {"gcc", "gxx", "clang", "clangxx"}})
                 end
         ]])
         local configs = {
