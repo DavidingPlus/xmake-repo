@@ -48,6 +48,10 @@ package("bundle")
                 if is_plat("windows") then
                     add_cxxflags("/bigobj", {tools = "cl"})
                 end
+                -- 内置 MCM 依赖 x86 的 SSE/SSE2 指令，ARM64 构建时禁用。
+                if is_arch("arm64") then
+                    add_defines("BUNDLE_NO_MCM")
+                end
         ]])
         local configs = {
             kind = package:config("shared") and "shared" or "static"
