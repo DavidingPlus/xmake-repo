@@ -8,6 +8,8 @@ package("cpp-base64")
     add_versions("2.rc.09", "951de609dbe27ce8864dfe47323c4ade96bee86e")
 
     if is_plat("windows") then
+        -- 避免安装时与其他包并发使用 MSVC 的 PDB 服务，规避 C1090。
+        set_parallelize(false)
         -- 让 MSVC 使用方按实际语言标准启用头文件中的 string_view 接口。
         add_cxxflags("/Zc:__cplusplus", {tools = {"cl", "clang_cl"}})
     end
