@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include <dlog/core/logger.h>
+#include <dlog/core/log.h>
 
 
 BaseEchoServer::BaseEchoServer(dmuduo::EventLoop *loop, const dmuduo::InetAddress &addr, const std::string &name, int threadNum)
