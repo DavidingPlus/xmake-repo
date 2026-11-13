@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  check-msvc:
+  show-msvc:
     runs-on: windows-2025
 
     steps:
@@ -15,6 +15,7 @@ jobs:
         $installations = & $vswhere -all -products * -format json | ConvertFrom-Json
         $installations | ForEach-Object {
           Write-Host "Visual Studio: $($_.displayName), version $($_.installationVersion)"
+          Write-Host ""
           $toolsets = Join-Path $_.installationPath "VC\Tools\MSVC"
           if (Test-Path $toolsets) {
             Get-ChildItem $toolsets -Directory | ForEach-Object {
@@ -26,6 +27,7 @@ jobs:
               } else {
                 Write-Host "x64 compiler not found"
               }
+              Write-Host ""
             }
           }
         }
