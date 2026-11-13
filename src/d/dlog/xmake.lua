@@ -8,14 +8,26 @@ add_requires("dlog~shared", {
     configs = {build_shared = true}
 })
 
-target("dlog-static")
+target("dlog-static-1")
     set_kind("binary")
-    add_files("main.cpp")
+    add_files("main1.cpp")
     add_packages("dlog-static")
 target_end()
 
-target("dlog-shared")
+target("dlog-shared-1")
     set_kind("binary")
-    add_files("main.cpp")
+    add_files("main1.cpp")
+    add_packages("dlog-shared")
+target_end()
+
+target("dlog-static-2")
+    set_kind("binary")
+    add_files("main2.cpp")
+    add_packages("dlog-static")
+target_end()
+
+target("dlog-shared-2")
+    set_kind("binary")
+    add_files("main2.cpp")
     add_packages("dlog-shared")
 target_end()
