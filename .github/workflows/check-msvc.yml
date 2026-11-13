@@ -1,0 +1,37 @@
+name: Check MSVC version
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-msvc:
+    runs-on: windows-2025
+
+    steps:
+    - name: Check Visual Studio and MSVC versions
+      shell: pwsh
+      run: |
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $installations = & $vswhere -all -products * -format json | ConvertFrom-Json
+        $installations | ForEach-Object {
+          Write-Host "Visual Studio: $($_.displayName), version $($_.installationVersion)"
+          $toolsets = Join-Path $_.installationPath "VC\Tools\MSVC"
+          if (Test-Path $toolsets) {
+            Get-ChildItem $toolsets -Directory | ForEach-Object { Write-Host "MSVC toolset: $($_.FullName)" }
+          }
+        }
+
+        $compilers = @($installations | ForEach-Object {
+          Join-Path $_.installationPath "VC\Tools\MSVC\14.29.30133\bin\HostX64\x64\cl.exe"
+        } | Where-Object { Test-Path $_ })
+        if (-not $compilers) { throw "MSVC 14.29.30133 x64 compiler was not found" }
+
+        $matched = $false
+        foreach ($compiler in $compilers) {
+          Write-Host "Compiler: $compiler"
+          $output = & cmd.exe /c "`"$compiler`" 2>&1"
+          $output | ForEach-Object { Write-Host $_ }
+          if ($output -match '\b19\.29\.30159\b') { $matched = $true }
+        }
+        if (-not $matched) { throw "Compiler version 19.29.30159 was not found" }
+        $global:LASTEXITCODE = 0
